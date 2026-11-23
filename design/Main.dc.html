@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Hockey Score</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:active{transform:scale(0.97)}
+button:focus-visible,input:focus-visible{outline:2px solid #F2F4F7;outline-offset:2px}
+.ring-ticks{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 7px));mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 7px))}
+.ring-arc{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 12px));mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 12px))}
+.scroll::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #F2F4F7; font-family: 'Barlow', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<sc-if value="{{ isMatch }}" hint-placeholder-val="{{ true }}">
+<div style="flex: 1; min-height: 0; box-sizing: border-box; padding: 20px 16px 16px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px">
+
+<div style="display: flex; gap: 6px">
+<sc-for list="{{ periods }}" as="p" hint-placeholder-count="2">
+<button onClick="{{ p.pick }}" aria-label="{{ p.aria }}" style="flex: 1; min-width: 0; height: 52px; background: transparent; display: flex; flex-direction: column; align-items: stretch; gap: 8px">
+<span style="display: block; height: 4px; border-radius: 2px; background: {{ p.bar }}"></span>
+<span style="display: flex; justify-content: center; align-items: baseline; gap: 6px; font-family: 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums">
+<span style="font-size: 14px; font-weight: 600; color: #8A8F98">{{ p.n }}</span>
+<span style="font-size: 22px; font-weight: 600; color: {{ p.ink }}">{{ p.score }}</span>
+</span>
+</button>
+</sc-for>
+</div>
+
+<div style="display: flex; justify-content: center">
+<button onClick="{{ toggle }}" aria-label="Timer starten of pauzeren" style="position: relative; width: 272px; height: 272px; border-radius: 50%; background: transparent">
+<span class="ring-ticks" aria-hidden="true" style="position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(#3A4048 0deg 0.9deg, transparent 0.9deg 6deg)"></span>
+<span class="ring-arc" aria-hidden="true" style="position: absolute; inset: 14px; border-radius: 50%; background: {{ ringBg }}"></span>
+<span style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 17px; font-weight: 600; letter-spacing: 0.14em; color: #8A8F98">DEEL {{ curLabel }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 92px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; color: {{ timeInk }}">{{ time }}</span>
+<span style="height: 28px; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ showPlay }}" hint-placeholder-val="{{ true }}">
+<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="#F2F4F7"><path d="M7 4.5v15l12-7.5z"></path></svg>
+</sc-if>
+<sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="#8A8F98"><rect x="6" y="5" width="4.5" height="14" rx="1"></rect><rect x="13.5" y="5" width="4.5" height="14" rx="1"></rect></svg>
+</sc-if>
+<sc-if value="{{ timeUp }}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+</sc-if>
+</span>
+</span>
+</button>
+</div>
+
+<div style="display: flex; gap: 10px">
+<div style="flex: 1; min-width: 0; background: #111417; border-radius: 26px; padding: 16px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+<div style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: {{ homeColor }}">{{ home }}</div>
+<div style="font-family: 'Barlow Condensed', sans-serif; font-size: 112px; line-height: 0.95; font-weight: 600; font-variant-numeric: tabular-nums">{{ homeTotal }}</div>
+<div style="display: flex; gap: 8px; width: 100%; margin-top: 6px">
+<button onClick="{{ homeMinus }}" aria-label="Doelpunt eraf, thuis" style="width: 52px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"></path></svg>
+</button>
+<button onClick="{{ homePlus }}" aria-label="Doelpunt erbij, thuis" style="flex: 1; height: 56px; border-radius: 18px; background: {{ homeColor }}; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+</button>
+</div>
+</div>
+<div style="flex: 1; min-width: 0; background: #111417; border-radius: 26px; padding: 16px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+<div style="max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: {{ awayColor }}">{{ away }}</div>
+<div style="font-family: 'Barlow Condensed', sans-serif; font-size: 112px; line-height: 0.95; font-weight: 600; font-variant-numeric: tabular-nums">{{ awayTotal }}</div>
+<div style="display: flex; gap: 8px; width: 100%; margin-top: 6px">
+<button onClick="{{ awayMinus }}" aria-label="Doelpunt eraf, uit" style="width: 52px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"></path></svg>
+</button>
+<button onClick="{{ awayPlus }}" aria-label="Doelpunt erbij, uit" style="flex: 1; height: 56px; border-radius: 18px; background: {{ awayColor }}; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+</button>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 10px">
+<button onClick="{{ reset }}" aria-label="Wedstrijd wissen" style="width: 56px; height: 56px; border-radius: 18px; background: {{ resetBg }}; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ resetInk }}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9"></path><path d="M4 4.5V9h4.5"></path></svg>
+</button>
+<button onClick="{{ next }}" style="flex: 1; height: 56px; border-radius: 18px; background: {{ nextBg }}; color: {{ nextInk }}; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase">
+<sc-if value="{{ isLast }}" hint-placeholder-val="{{ false }}"><span>Opslaan</span></sc-if>
+<sc-if value="{{ notLast }}" hint-placeholder-val="{{ true }}"><span>Volgend deel</span></sc-if>
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+</button>
+</div>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ isHistory }}" hint-placeholder-val="{{ false }}">
+<div class="scroll" style="flex: 1; min-height: 0; box-sizing: border-box; padding: 28px 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px">
+<h1 style="margin: 0 4px 10px; font-family: 'Barlow Condensed', sans-serif; font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase">Uitslagen</h1>
+<sc-if value="{{ noHistory }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #8A8F98">
+<svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#3A4048" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+<span style="font-size: 16px">Nog geen wedstrijden</span>
+</div>
+</sc-if>
+<sc-for list="{{ history }}" as="m" hint-placeholder-count="2">
+<div style="background: #111417; border-radius: 26px; padding: 14px 8px 16px 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8F98">{{ m.date }}</span>
+<button onClick="{{ m.remove }}" aria-label="Uitslag verwijderen" style="width: 44px; height: 44px; margin: -8px 0; border-radius: 14px; background: transparent; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8F98" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+<sc-if value="{{ m.showTotal }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 10px; padding-right: 10px">
+<span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: {{ homeColor }}">{{ m.home }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 52px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap">{{ m.total }}</span>
+<span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: {{ awayColor }}">{{ m.away }}</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; padding-right: 10px">
+<sc-for list="{{ m.parts }}" as="q" hint-placeholder-count="2">
+<span style="display: flex; align-items: baseline; gap: 6px; padding: 5px 10px; border-radius: 10px; background: #1E2329; font-family: 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums">
+<span style="font-size: 14px; font-weight: 600; color: #8A8F98">{{ q.n }}</span>
+<span style="font-size: 18px; font-weight: 600">{{ q.score }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ m.perPart }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px; padding-right: 10px">
+<div style="display: flex; justify-content: space-between; gap: 10px">
+<span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: {{ homeColor }}">{{ m.home }}</span>
+<span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: {{ awayColor }}">{{ m.away }}</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{ m.parts }}" as="q" hint-placeholder-count="2">
+<span style="flex: 1; min-width: 72px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px 10px; border-radius: 16px; background: #1E2329; font-family: 'Barlow Condensed', sans-serif; font-variant-numeric: tabular-nums">
+<span style="font-size: 14px; font-weight: 600; letter-spacing: 0.1em; color: #8A8F98">{{ q.n }}</span>
+<span style="font-size: 44px; line-height: 1; font-weight: 600; white-space: nowrap">{{ q.score }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div class="scroll" style="flex: 1; min-height: 0; box-sizing: border-box; padding: 28px 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px">
+<h1 style="margin: 0 4px 10px; font-family: 'Barlow Condensed', sans-serif; font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase">Instellingen</h1>
+
+<div style="background: #111417; border-radius: 26px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="team-home" style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: {{ homeColor }}">Thuis</label>
+<input id="team-home" type="text" maxlength="16" autocomplete="off" value="{{ home }}" onChange="{{ setHome }}" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 0; border-radius: 16px; background: #1E2329; color: #F2F4F7; font-family: 'Barlow', sans-serif; font-size: 18px; font-weight: 500">
+<div style="display: flex; justify-content: space-between; padding: 4px 2px 0">
+<sc-for list="{{ homeSwatches }}" as="c" hint-placeholder-count="6">
+<button onClick="{{ c.pick }}" aria-label="{{ c.aria }}" aria-pressed="{{ c.pressed }}" style="width: 44px; height: 44px; border-radius: 50%; background: transparent; display: flex; align-items: center; justify-content: center">
+<span style="display: block; width: 30px; height: 30px; border-radius: 50%; background: {{ c.hex }}; box-shadow: {{ c.shadow }}"></span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="team-away" style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: {{ awayColor }}">Uit</label>
+<input id="team-away" type="text" maxlength="16" autocomplete="off" value="{{ away }}" onChange="{{ setAway }}" style="box-sizing: border-box; width: 100%; height: 52px; padding: 0 16px; border: 0; border-radius: 16px; background: #1E2329; color: #F2F4F7; font-family: 'Barlow', sans-serif; font-size: 18px; font-weight: 500">
+<div style="display: flex; justify-content: space-between; padding: 4px 2px 0">
+<sc-for list="{{ awaySwatches }}" as="c" hint-placeholder-count="6">
+<button onClick="{{ c.pick }}" aria-label="{{ c.aria }}" aria-pressed="{{ c.pressed }}" style="width: 44px; height: 44px; border-radius: 50%; background: transparent; display: flex; align-items: center; justify-content: center">
+<span style="display: block; width: 30px; height: 30px; border-radius: 50%; background: {{ c.hex }}; box-shadow: {{ c.shadow }}"></span>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="background: #111417; border-radius: 26px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8F98">Delen</span>
+<div style="display: flex; align-items: center; gap: 10px">
+<button onClick="{{ partsDown }}" aria-label="Minder delen" style="width: 64px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"></path></svg>
+</button>
+<span style="flex: 1; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-size: 64px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums">{{ parts }}</span>
+<button onClick="{{ partsUp }}" aria-label="Meer delen" style="width: 64px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg>
+</button>
+</div>
+</div>
+
+<div style="background: #111417; border-radius: 26px; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8F98">Minuten per deel</span>
+<div style="display: flex; align-items: center; gap: 10px">
+<button onClick="{{ minsDown }}" aria-label="Minder minuten" style="width: 64px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"></path></svg>
+</button>
+<span style="flex: 1; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-size: 64px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums">{{ mins }}</span>
+<button onClick="{{ minsUp }}" aria-label="Meer minuten" style="width: 64px; height: 56px; border-radius: 18px; background: #1E2329; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg>
+</button>
+</div>
+</div>
+
+<button role="switch" aria-checked="{{ perPartAria }}" onClick="{{ togglePerPart }}" style="flex-shrink: 0; height: 72px; background: #111417; border-radius: 26px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8A8F98">Score per deel</span>
+<span aria-hidden="true" style="flex-shrink: 0; width: 64px; height: 36px; box-sizing: border-box; padding: 4px; border-radius: 18px; background: {{ switchBg }}; display: block">
+<span style="display: block; width: 28px; height: 28px; border-radius: 50%; background: {{ knobBg }}; transform: translateX({{ knobX }})"></span>
+</span>
+</button>
+</div>
+</sc-if>
+
+<nav style="height: 76px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 8px; border-top: 1px solid #1E2329; display: flex; align-items: center; gap: 6px">
+<button onClick="{{ goMatch }}" style="flex: 1; height: 56px; border-radius: 18px; background: transparent; color: {{ tabMatchInk }}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em">
+<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2"></path><path d="M9.5 2.5h5"></path></svg>
+<span>Wedstrijd</span>
+</button>
+<button onClick="{{ goHistory }}" style="flex: 1; height: 56px; border-radius: 18px; background: transparent; color: {{ tabHistoryInk }}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em">
+<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h9"></path></svg>
+<span>Uitslagen</span>
+</button>
+<button onClick="{{ goSettings }}" style="flex: 1; height: 56px; border-radius: 18px; background: transparent; color: {{ tabSettingsInk }}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em">
+<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="17" r="2"></circle></svg>
+<span>Instellingen</span>
+</button>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"homeColor":{"editor":"color","default":"#D7FF3F","options":["#D7FF3F","#5CE1FF","#FFFFFF"],"section":"Teamkleuren"},"awayColor":{"editor":"color","default":"#FF7A33","options":["#FF7A33","#FF5C8A","#B79CFF"],"section":"Teamkleuren"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+var KEY = 'hockeyscore.v1';
+this.KEY = KEY;
+var s = {
+tab: 'match', home: 'Thuis', away: 'Uit', parts: 2, mins: 25,
+scores: [[0, 0], [0, 0]], cur: 0, remaining: 25 * 60000,
+running: false, endAt: 0, history: [], armReset: false, perPart: false
+};
+try {
+var raw = window.localStorage.getItem(KEY);
+if (raw) {
+var saved = JSON.parse(raw);
+if (saved && Array.isArray(saved.scores)) {
+for (var k in saved) s[k] = saved[k];
+s.armReset = false;
+if (s.running) {
+s.remaining = Math.max(0, s.endAt - Date.now());
+if (s.remaining === 0) s.running = false;
+}
+}
+}
+} catch (e) {}
+this.state = s;
+}
+componentDidMount() {
+var self = this;
+this.timer = setInterval(function () {
+if (!self.state.running) return;
+if (self.state.endAt - Date.now() <= 0) {
+self.setState({ running: false, remaining: 0 });
+try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]); } catch (e) {}
+} else {
+self.forceUpdate();
+}
+}, 250);
+}
+componentWillUnmount() {
+clearInterval(this.timer);
+clearTimeout(this.armTimer);
+}
+componentDidUpdate() {
+try { window.localStorage.setItem(this.KEY, JSON.stringify(this.state)); } catch (e) {}
+}
+full() { return this.state.mins * 60000; }
+left() {
+var s = this.state;
+return s.running ? Math.max(0, s.endAt - Date.now()) : s.remaining;
+}
+bump(side, d) {
+var s = this.state;
+var scores = s.scores.map(function (p) { return p.slice(); });
+scores[s.cur][side] = Math.max(0, scores[s.cur][side] + d);
+this.setState({ scores: scores });
+}
+fresh() {
+var scores = [];
+for (var i = 0; i < this.state.parts; i++) scores.push([0, 0]);
+return { scores: scores, cur: 0, remaining: this.full(), running: false, endAt: 0, armReset: false };
+}
+renderVals() {
+var self = this;
+var s = this.state;
+var homeColor = s.homeColor || this.props.homeColor || '#D7FF3F';
+var awayColor = s.awayColor || this.props.awayColor || '#FF7A33';
+var palette = [['#D7FF3F', 'Lime'], ['#FF7A33', 'Oranje'], ['#5CE1FF', 'Blauw'], ['#FF5C8A', 'Roze'], ['#B79CFF', 'Paars'], ['#FFFFFF', 'Wit']];
+var swatches = function (key, current, team) {
+return palette.map(function (c) {
+var on = c[0].toLowerCase() === String(current).toLowerCase();
+var patch = {};
+patch[key] = c[0];
+return {
+hex: c[0],
+aria: team + ': ' + c[1],
+pressed: on ? 'true' : 'false',
+shadow: on ? '0 0 0 3px #111417, 0 0 0 5px ' + c[0] : 'none',
+pick: function () { self.setState(patch); }
+};
+});
+};
+var left = this.left();
+var full = this.full();
+var timeUp = left <= 0;
+var secs = Math.ceil(left / 1000);
+var mm = Math.floor(secs / 60);
+var ss = secs % 60;
+var time = (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+var deg = Math.max(0, Math.min(360, (left / full) * 360));
+var ringInk = s.running ? '#F2F4F7' : '#6B727C';
+var isLast = s.cur >= s.parts - 1;
+var sum = function (list, side) {
+return list.reduce(function (t, p) { return t + p[side]; }, 0);
+};
+var dash = '–';
+var periods = s.scores.map(function (p, i) {
+var on = i === s.cur;
+return {
+n: i + 1,
+score: p[0] + dash + p[1],
+bar: on ? '#F2F4F7' : (i < s.cur ? '#6B727C' : '#23282E'),
+ink: on ? '#F2F4F7' : '#8A8F98',
+aria: 'Deel ' + (i + 1),
+pick: function () { self.setState({ cur: i }); }
+};
+});
+var history = s.history.map(function (m) {
+return {
+date: m.date, home: m.home, away: m.away,
+perPart: !!m.perPart, showTotal: !m.perPart,
+total: sum(m.scores, 0) + dash + sum(m.scores, 1),
+parts: m.scores.map(function (p, i) { return { n: i + 1, score: p[0] + dash + p[1] }; }),
+remove: function () {
+self.setState({ history: self.state.history.filter(function (x) { return x.id !== m.id; }) });
+}
+};
+});
+var tabInk = function (t) { return s.tab === t ? '#F2F4F7' : '#8A8F98'; };
+return {
+homeColor: homeColor, awayColor: awayColor,
+isMatch: s.tab === 'match', isHistory: s.tab === 'history', isSettings: s.tab === 'settings',
+tabMatchInk: tabInk('match'), tabHistoryInk: tabInk('history'), tabSettingsInk: tabInk('settings'),
+goMatch: function () { self.setState({ tab: 'match' }); },
+goHistory: function () { self.setState({ tab: 'history' }); },
+goSettings: function () { self.setState({ tab: 'settings' }); },
+home: s.home, away: s.away,
+homeTotal: s.perPart ? s.scores[s.cur][0] : sum(s.scores, 0),
+awayTotal: s.perPart ? s.scores[s.cur][1] : sum(s.scores, 1),
+periods: periods,
+curLabel: (s.cur + 1) + '/' + s.parts,
+time: time,
+timeInk: timeUp ? '#8A8F98' : '#F2F4F7',
+ringBg: 'conic-gradient(' + ringInk + ' ' + deg + 'deg, #1A1E23 0deg)',
+running: s.running && !timeUp,
+showPlay: !s.running && !timeUp,
+timeUp: timeUp,
+isLast: isLast, notLast: !isLast,
+nextBg: timeUp ? '#F2F4F7' : '#1E2329',
+nextInk: timeUp ? '#000000' : '#F2F4F7',
+resetBg: s.armReset ? '#FF5A52' : '#1E2329',
+resetInk: s.armReset ? '#000000' : '#F2F4F7',
+toggle: function () {
+var l = self.left();
+if (l <= 0) return;
+if (self.state.running) self.setState({ running: false, remaining: l });
+else self.setState({ running: true, endAt: Date.now() + l });
+},
+homePlus: function () { self.bump(0, 1); },
+homeMinus: function () { self.bump(0, -1); },
+awayPlus: function () { self.bump(1, 1); },
+awayMinus: function () { self.bump(1, -1); },
+next: function () {
+var st = self.state;
+if (st.cur < st.parts - 1) {
+self.setState({ cur: st.cur + 1, remaining: self.full(), running: false, endAt: 0 });
+return;
+}
+var date = '';
+try { date = new Date().toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) {}
+var entry = { id: Date.now(), date: date, home: st.home, away: st.away, scores: st.scores, perPart: !!st.perPart };
+var nextState = self.fresh();
+nextState.history = [entry].concat(st.history).slice(0, 100);
+nextState.tab = 'history';
+self.setState(nextState);
+},
+reset: function () {
+clearTimeout(self.armTimer);
+if (self.state.armReset) { self.setState(self.fresh()); return; }
+self.setState({ armReset: true });
+self.armTimer = setTimeout(function () { self.setState({ armReset: false }); }, 2500);
+},
+noHistory: s.history.length === 0,
+history: history,
+setHome: function (e) { self.setState({ home: e.target.value }); },
+setAway: function (e) { self.setState({ away: e.target.value }); },
+parts: s.parts, mins: s.mins,
+homeSwatches: swatches('homeColor', homeColor, 'Thuis'),
+awaySwatches: swatches('awayColor', awayColor, 'Uit'),
+perPartAria: s.perPart ? 'true' : 'false',
+switchBg: s.perPart ? '#F2F4F7' : '#2A3038',
+knobBg: s.perPart ? '#000000' : '#8A8F98',
+knobX: s.perPart ? '28px' : '0px',
+togglePerPart: function () { self.setState({ perPart: !self.state.perPart }); },
+partsDown: function () { self.setParts(-1); },
+partsUp: function () { self.setParts(1); },
+minsDown: function () { self.setMins(-1); },
+minsUp: function () { self.setMins(1); }
+};
+}
+setParts(d) {
+var s = this.state;
+var n = Math.max(1, Math.min(8, s.parts + d));
+if (n === s.parts) return;
+var scores = s.scores.slice(0, n);
+while (scores.length < n) scores.push([0, 0]);
+this.setState({ parts: n, scores: scores, cur: Math.min(s.cur, n - 1) });
+}
+setMins(d) {
+var s = this.state;
+var n = Math.max(1, Math.min(60, s.mins + d));
+if (n === s.mins) return;
+var next = { mins: n };
+if (!s.running && s.remaining === s.mins * 60000) next.remaining = n * 60000;
+this.setState(next);
+}
+}
+</script>
+</body>
+</html>
