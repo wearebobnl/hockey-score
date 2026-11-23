@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Hockey Score</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{height:100%;margin:0;background:#000;overscroll-behavior:none}
+body{color:#F2F4F7;font-family:'Barlow',system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+input{-webkit-user-select:text;user-select:text}
+button{font:inherit;color:inherit;border:0;padding:0;margin:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:active{transform:scale(0.97)}
+button:focus-visible,input:focus-visible{outline:2px solid #F2F4F7;outline-offset:2px}
+.cond{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}
+#app{--ring:clamp(170px,32dvh,272px);--score:clamp(64px,13dvh,112px);box-sizing:border-box;height:100vh;height:100dvh;max-width:480px;margin:0 auto;padding-top:env(safe-area-inset-top);display:flex;flex-direction:column;overflow:hidden}
+@media (max-height:680px){#app{--ring:26dvh;--score:10.5dvh}.match{padding-top:10px!important;padding-bottom:10px!important;gap:8px!important}}
+.ring-ticks{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 7px));mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 7px))}
+.ring-arc{-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 12px));mask:radial-gradient(farthest-side,transparent calc(100% - 12px),#000 calc(100% - 12px))}
+.scroll::-webkit-scrollbar{display:none}
+.screen{flex:1;min-height:0;box-sizing:border-box;display:flex;flex-direction:column}
+.card{background:#111417;border-radius:26px}
+.label{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#8A8F98}
+.sq{border-radius:18px;background:#1E2329;display:flex;align-items:center;justify-content:center}
+.team{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;text-transform:uppercase}
+h1{margin:0 4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:34px;line-height:1;font-weight:600;letter-spacing:0.06em;text-transform:uppercase}
+.field{box-sizing:border-box;width:100%;height:52px;padding:0 16px;border:0;border-radius:16px;background:#1E2329;color:#F2F4F7;font-family:'Barlow',sans-serif;font-size:18px;font-weight:500}
+.big{flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:64px;line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
+nav{flex-shrink:0;box-sizing:border-box;padding:10px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid #1E2329;display:flex;align-items:center;gap:6px}
+nav button{flex:1;height:56px;border-radius:18px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;letter-spacing:0.04em}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+'use strict';
+var KEY = 'hockeyscore.v1';
+var PALETTE = [['#D7FF3F', 'Lime'], ['#FF7A33', 'Oranje'], ['#5CE1FF', 'Blauw'], ['#FF5C8A', 'Roze'], ['#B79CFF', 'Paars'], ['#FFFFFF', 'Wit']];
+var DASH = '–';
+var app = document.getElementById('app');
+var armTimer = 0;
+
+var state = {
+  tab: 'match', home: 'Thuis', away: 'Uit', parts: 2, mins: 25,
+  scores: [[0, 0], [0, 0]], cur: 0, remaining: 25 * 60000,
+  running: false, endAt: 0, history: [], armReset: false, perPart: false
+};
+try {
+  var raw = window.localStorage.getItem(KEY);
+  if (raw) {
+    var saved = JSON.parse(raw);
+    if (saved && Array.isArray(saved.scores)) {
+      for (var k in saved) state[k] = saved[k];
+      state.armReset = false;
+      if (state.running) {
+        state.remaining = Math.max(0, state.endAt - Date.now());
+        if (state.remaining === 0) state.running = false;
+      }
+    }
+  }
+} catch (e) {}
+
+function save() {
+  try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+}
+function setState(patch) {
+  for (var k in patch) state[k] = patch[k];
+  save();
+  render();
+}
+function esc(v) {
+  return String(v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function full() { return state.mins * 60000; }
+function left() { return state.running ? Math.max(0, state.endAt - Date.now()) : state.remaining; }
+function sum(list, side) { return list.reduce(function (t, p) { return t + p[side]; }, 0); }
+function fresh() {
+  var scores = [];
+  for (var i = 0; i < state.parts; i++) scores.push([0, 0]);
+  return { scores: scores, cur: 0, remaining: full(), running: false, endAt: 0, armReset: false };
+}
+function homeColor() { return state.homeColor || '#D7FF3F'; }
+function awayColor() { return state.awayColor || '#FF7A33'; }
+function clock() {
+  var l = left();
+  var secs = Math.ceil(l / 1000);
+  var mm = Math.floor(secs / 60);
+  var ss = secs % 60;
+  var deg = Math.max(0, Math.min(360, (l / full()) * 360));
+  return {
+    timeUp: l <= 0,
+    time: (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss,
+    ringBg: 'conic-gradient(' + (state.running ? '#F2F4F7' : '#6B727C') + ' ' + deg + 'deg, #1A1E23 0deg)'
+  };
+}
+
+var ICON = {
+  minus: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"></path></svg>',
+  plus: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"></path></svg>',
+  goal: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>',
+  play: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="#F2F4F7"><path d="M7 4.5v15l12-7.5z"></path></svg>',
+  pause: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="#8A8F98"><rect x="6" y="5" width="4.5" height="14" rx="1"></rect><rect x="13.5" y="5" width="4.5" height="14" rx="1"></rect></svg>',
+  done: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2F4F7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>'
+};
+
+function teamCard(side, name, color, total, word) {
+  return '<div class="card" style="flex:1;min-width:0;padding:16px 12px 12px;display:flex;flex-direction:column;align-items:center;gap:4px">' +
+    '<div class="team" style="max-width:100%;letter-spacing:0.08em;color:' + color + '">' + esc(name) + '</div>' +
+    '<div class="cond" style="font-size:var(--score);line-height:0.95;font-weight:600">' + total + '</div>' +
+    '<div style="display:flex;gap:8px;width:100%;margin-top:6px">' +
+    '<button class="sq" data-act="bump" data-arg="' + side + ',-1" aria-label="Doelpunt eraf, ' + word + '" style="width:52px;height:56px">' + ICON.minus + '</button>' +
+    '<button data-act="bump" data-arg="' + side + ',1" aria-label="Doelpunt erbij, ' + word + '" style="flex:1;height:56px;border-radius:18px;background:' + color + ';display:flex;align-items:center;justify-content:center">' + ICON.goal + '</button>' +
+    '</div></div>';
+}
+
+function matchView() {
+  var s = state;
+  var c = clock();
+  var isLast = s.cur >= s.parts - 1;
+  var periods = s.scores.map(function (p, i) {
+    var on = i === s.cur;
+    return '<button data-act="pick" data-arg="' + i + '" aria-label="Deel ' + (i + 1) + '" style="flex:1;min-width:0;height:52px;background:transparent;display:flex;flex-direction:column;align-items:stretch;gap:8px">' +
+      '<span style="display:block;height:4px;border-radius:2px;background:' + (on ? '#F2F4F7' : (i < s.cur ? '#6B727C' : '#23282E')) + '"></span>' +
+      '<span class="cond" style="display:flex;justify-content:center;align-items:baseline;gap:6px">' +
+      '<span style="font-size:14px;font-weight:600;color:#8A8F98">' + (i + 1) + '</span>' +
+      '<span style="font-size:22px;font-weight:600;color:' + (on ? '#F2F4F7' : '#8A8F98') + '">' + p[0] + DASH + p[1] + '</span>' +
+      '</span></button>';
+  }).join('');
+  var icon = c.timeUp ? ICON.done : (s.running ? ICON.pause : ICON.play);
+  return '<div class="screen match" style="padding:20px 16px 16px;justify-content:space-between;gap:12px">' +
+    '<div style="display:flex;gap:6px">' + periods + '</div>' +
+    '<div style="display:flex;justify-content:center">' +
+    '<button data-act="toggle" aria-label="Timer starten of pauzeren" style="position:relative;width:var(--ring);height:var(--ring);border-radius:50%;background:transparent">' +
+    '<span class="ring-ticks" aria-hidden="true" style="position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(#3A4048 0deg 0.9deg, transparent 0.9deg 6deg)"></span>' +
+    '<span id="ring" class="ring-arc" aria-hidden="true" style="position:absolute;inset:14px;border-radius:50%;background:' + c.ringBg + '"></span>' +
+    '<span style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">' +
+    '<span class="cond" style="font-size:17px;font-weight:600;letter-spacing:0.14em;color:#8A8F98">DEEL ' + (s.cur + 1) + '/' + s.parts + '</span>' +
+    '<span id="time" class="cond" style="font-size:calc(var(--ring) * 0.338);line-height:1;font-weight:600;color:' + (c.timeUp ? '#8A8F98' : '#F2F4F7') + '">' + c.time + '</span>' +
+    '<span style="height:28px;display:flex;align-items:center;justify-content:center">' + icon + '</span>' +
+    '</span></button></div>' +
+    '<div style="display:flex;gap:10px">' +
+    teamCard(0, s.home, homeColor(), s.perPart ? s.scores[s.cur][0] : sum(s.scores, 0), 'thuis') +
+    teamCard(1, s.away, awayColor(), s.perPart ? s.scores[s.cur][1] : sum(s.scores, 1), 'uit') +
+    '</div>' +
+    '<div style="display:flex;gap:10px">' +
+    '<button data-act="reset" aria-label="Wedstrijd wissen" style="width:56px;height:56px;border-radius:18px;background:' + (s.armReset ? '#FF5A52' : '#1E2329') + ';display:flex;align-items:center;justify-content:center">' +
+    '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + (s.armReset ? '#000000' : '#F2F4F7') + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9"></path><path d="M4 4.5V9h4.5"></path></svg></button>' +
+    '<button data-act="next" class="cond" style="flex:1;height:56px;border-radius:18px;background:' + (c.timeUp ? '#F2F4F7' : '#1E2329') + ';color:' + (c.timeUp ? '#000000' : '#F2F4F7') + ';display:flex;align-items:center;justify-content:center;gap:8px;font-size:20px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase">' +
+    '<span>' + (isLast ? 'Opslaan' : 'Volgend deel') + '</span>' +
+    '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>' +
+    '</button></div></div>';
+}
+
+function historyView() {
+  var hc = homeColor(), ac = awayColor();
+  var body;
+  if (!state.history.length) {
+    body = '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#8A8F98">' +
+      '<svg aria-hidden="true" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#3A4048" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>' +
+      '<span style="font-size:16px">Nog geen wedstrijden</span></div>';
+  } else {
+    body = state.history.map(function (m) {
+      var inner;
+      if (m.perPart) {
+        inner = '<div style="display:flex;flex-direction:column;gap:10px;padding-right:10px">' +
+          '<div style="display:flex;justify-content:space-between;gap:10px">' +
+          '<span class="team" style="min-width:0;letter-spacing:0.06em;color:' + hc + '">' + esc(m.home) + '</span>' +
+          '<span class="team" style="min-width:0;letter-spacing:0.06em;color:' + ac + '">' + esc(m.away) + '</span></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+          m.scores.map(function (p, i) {
+            return '<span class="cond" style="flex:1;min-width:72px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px 10px;border-radius:16px;background:#1E2329">' +
+              '<span style="font-size:14px;font-weight:600;letter-spacing:0.1em;color:#8A8F98">' + (i + 1) + '</span>' +
+              '<span style="font-size:44px;line-height:1;font-weight:600;white-space:nowrap">' + p[0] + DASH + p[1] + '</span></span>';
+          }).join('') + '</div></div>';
+      } else {
+        inner = '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<div style="display:flex;align-items:center;gap:10px;padding-right:10px">' +
+          '<span class="team" style="flex:1;min-width:0;letter-spacing:0.06em;color:' + hc + '">' + esc(m.home) + '</span>' +
+          '<span class="cond" style="font-size:52px;line-height:1;font-weight:600;white-space:nowrap">' + sum(m.scores, 0) + DASH + sum(m.scores, 1) + '</span>' +
+          '<span class="team" style="flex:1;min-width:0;text-align:right;letter-spacing:0.06em;color:' + ac + '">' + esc(m.away) + '</span></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;padding-right:10px">' +
+          m.scores.map(function (p, i) {
+            return '<span class="cond" style="display:flex;align-items:baseline;gap:6px;padding:5px 10px;border-radius:10px;background:#1E2329">' +
+              '<span style="font-size:14px;font-weight:600;color:#8A8F98">' + (i + 1) + '</span>' +
+              '<span style="font-size:18px;font-weight:600">' + p[0] + DASH + p[1] + '</span></span>';
+          }).join('') + '</div></div>';
+      }
+      return '<div class="card" style="flex-shrink:0;padding:14px 8px 16px 18px;display:flex;flex-direction:column;gap:10px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<span class="label">' + esc(m.date) + '</span>' +
+        '<button data-act="remove" data-arg="' + esc(m.id) + '" aria-label="Uitslag verwijderen" style="width:44px;height:44px;margin:-8px 0;border-radius:14px;background:transparent;display:flex;align-items:center;justify-content:center">' +
+        '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8F98" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>' +
+        inner + '</div>';
+    }).join('');
+  }
+  return '<div class="screen scroll" style="padding:28px 16px 16px;overflow-y:auto;gap:10px"><h1>Uitslagen</h1>' + body + '</div>';
+}
+
+function swatches(key, current, team) {
+  return PALETTE.map(function (c) {
+    var on = c[0].toLowerCase() === String(current).toLowerCase();
+    return '<button data-act="color" data-arg="' + key + ',' + c[0] + '" aria-label="' + team + ': ' + c[1] + '" aria-pressed="' + on + '" style="width:44px;height:44px;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center">' +
+      '<span style="display:block;width:30px;height:30px;border-radius:50%;background:' + c[0] + ';box-shadow:' + (on ? '0 0 0 3px #111417, 0 0 0 5px ' + c[0] : 'none') + '"></span></button>';
+  }).join('');
+}
+function teamField(id, label, value, color, key) {
+  return '<div style="display:flex;flex-direction:column;gap:8px">' +
+    '<label for="' + id + '" class="label" style="color:' + color + '">' + label + '</label>' +
+    '<input id="' + id + '" class="field" type="text" maxlength="16" autocomplete="off" value="' + esc(value) + '">' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 2px 0">' + swatches(key, color, label) + '</div></div>';
+}
+function stepper(label, value, act, lessLabel, moreLabel) {
+  return '<div class="card" style="flex-shrink:0;padding:18px;display:flex;flex-direction:column;gap:12px">' +
+    '<span class="label">' + label + '</span>' +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+    '<button class="sq" data-act="' + act + '" data-arg="-1" aria-label="' + lessLabel + '" style="width:64px;height:56px">' + ICON.minus + '</button>' +
+    '<span class="big">' + value + '</span>' +
+    '<button class="sq" data-act="' + act + '" data-arg="1" aria-label="' + moreLabel + '" style="width:64px;height:56px">' + ICON.plus + '</button>' +
+    '</div></div>';
+}
+function settingsView() {
+  var s = state;
+  return '<div class="screen scroll" style="padding:28px 16px 16px;overflow-y:auto;gap:10px"><h1>Instellingen</h1>' +
+    '<div class="card" style="flex-shrink:0;padding:18px;display:flex;flex-direction:column;gap:14px">' +
+    teamField('team-home', 'Thuis', s.home, homeColor(), 'homeColor') +
+    teamField('team-away', 'Uit', s.away, awayColor(), 'awayColor') +
+    '</div>' +
+    stepper('Delen', s.parts, 'parts', 'Minder delen', 'Meer delen') +
+    stepper('Minuten per deel', s.mins, 'mins', 'Minder minuten', 'Meer minuten') +
+    '<button role="switch" aria-checked="' + !!s.perPart + '" data-act="perPart" class="card" style="flex-shrink:0;height:72px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left">' +
+    '<span class="label">Score per deel</span>' +
+    '<span aria-hidden="true" style="flex-shrink:0;width:64px;height:36px;box-sizing:border-box;padding:4px;border-radius:18px;background:' + (s.perPart ? '#F2F4F7' : '#2A3038') + ';display:block">' +
+    '<span style="display:block;width:28px;height:28px;border-radius:50%;background:' + (s.perPart ? '#000000' : '#8A8F98') + ';transform:translateX(' + (s.perPart ? '28px' : '0px') + ')"></span></span>' +
+    '</button></div>';
+}
+
+function tabButton(tab, label, icon) {
+  return '<button data-act="tab" data-arg="' + tab + '" style="color:' + (state.tab === tab ? '#F2F4F7' : '#8A8F98') + '">' +
+    '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + icon + '</svg>' +
+    '<span>' + label + '</span></button>';
+}
+
+function render() {
+  var view = state.tab === 'history' ? historyView() : state.tab === 'settings' ? settingsView() : matchView();
+  app.innerHTML = view + '<nav>' +
+    tabButton('match', 'Wedstrijd', '<circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2"></path><path d="M9.5 2.5h5"></path>') +
+    tabButton('history', 'Uitslagen', '<path d="M5 6h14M5 12h14M5 18h9"></path>') +
+    tabButton('settings', 'Instellingen', '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="17" r="2"></circle>') +
+    '</nav>';
+}
+
+var actions = {
+  tab: function (t) { setState({ tab: t }); },
+  pick: function (i) { setState({ cur: Number(i) }); },
+  toggle: function () {
+    var l = left();
+    if (l <= 0) return;
+    if (state.running) setState({ running: false, remaining: l });
+    else setState({ running: true, endAt: Date.now() + l });
+  },
+  bump: function (arg) {
+    var a = arg.split(',');
+    var side = Number(a[0]);
+    var scores = state.scores.map(function (p) { return p.slice(); });
+    scores[state.cur][side] = Math.max(0, scores[state.cur][side] + Number(a[1]));
+    setState({ scores: scores });
+  },
+  next: function () {
+    var st = state;
+    if (st.cur < st.parts - 1) {
+      setState({ cur: st.cur + 1, remaining: full(), running: false, endAt: 0 });
+      return;
+    }
+    var date = '';
+    try { date = new Date().toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) {}
+    var entry = { id: Date.now(), date: date, home: st.home, away: st.away, scores: st.scores, perPart: !!st.perPart };
+    var nextState = fresh();
+    nextState.history = [entry].concat(st.history).slice(0, 100);
+    nextState.tab = 'history';
+    setState(nextState);
+  },
+  reset: function () {
+    clearTimeout(armTimer);
+    if (state.armReset) { setState(fresh()); return; }
+    setState({ armReset: true });
+    armTimer = setTimeout(function () { setState({ armReset: false }); }, 2500);
+  },
+  remove: function (id) {
+    setState({ history: state.history.filter(function (x) { return String(x.id) !== String(id); }) });
+  },
+  color: function (arg) {
+    var a = arg.split(',');
+    var patch = {};
+    patch[a[0]] = a[1];
+    setState(patch);
+  },
+  parts: function (d) {
+    var n = Math.max(1, Math.min(8, state.parts + Number(d)));
+    if (n === state.parts) return;
+    var scores = state.scores.slice(0, n);
+    while (scores.length < n) scores.push([0, 0]);
+    setState({ parts: n, scores: scores, cur: Math.min(state.cur, n - 1) });
+  },
+  mins: function (d) {
+    var n = Math.max(1, Math.min(60, state.mins + Number(d)));
+    if (n === state.mins) return;
+    var patch = { mins: n };
+    if (!state.running && state.remaining === state.mins * 60000) patch.remaining = n * 60000;
+    setState(patch);
+  },
+  perPart: function () { setState({ perPart: !state.perPart }); }
+};
+
+app.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-act]');
+  if (!b || !actions[b.dataset.act]) return;
+  actions[b.dataset.act](b.dataset.arg);
+});
+// Typing a team name saves without redrawing, so the field keeps focus.
+app.addEventListener('input', function (e) {
+  if (e.target.id === 'team-home') state.home = e.target.value;
+  else if (e.target.id === 'team-away') state.away = e.target.value;
+  else return;
+  save();
+});
+
+setInterval(function () {
+  if (!state.running) return;
+  if (state.endAt - Date.now() <= 0) {
+    state.running = false;
+    state.remaining = 0;
+    save();
+    try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]); } catch (e) {}
+    if (state.tab === 'match') render();
+    return;
+  }
+  // Only the clock is touched while running, so a tap in progress is never lost to a redraw.
+  var t = document.getElementById('time');
+  var r = document.getElementById('ring');
+  if (!t || !r) return;
+  var c = clock();
+  t.textContent = c.time;
+  r.style.background = c.ringBg;
+}, 250);
+
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+})();
+</script>
+</body>
+</html>
